@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Active Examination</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .question-card { margin-bottom: 2rem; border-left: 4px solid var(--primary); }
+        .option-lbl { display: block; padding: 10px; background: rgba(255,255,255,0.05); margin-bottom: 5px; border-radius: 5px; cursor: pointer; transition: 0.2s; }
+        .option-lbl:hover { background: rgba(79, 70, 229, 0.2); }
+        input[type="radio"] { width: auto; margin-right: 10px; }
+        #timer { font-size: 2rem; font-weight: 700; color: #ef4444; }
+    </style>
+</head>
+<body>
+    <div class="navbar" style="background: var(--danger);">
+        <h2>Exam In Progress</h2>
+        <div class="nav-links">
+            <span id="warningMsg" style="font-weight: 700;">PROCTORING IS ACTIVE. DO NOT SWITCH TABS.</span>
+        </div>
+    </div>
+
+    <div class="container" style="max-width: 800px;">
+        <div id="msg"></div>
+        <div id="questionsContainer"></div>
+        <button id="submitBtn" class="btn btn-secondary" style="width: 100%; margin-top:2rem;" onclick="submitExam()">Submit Exam</button>
+    </div>
+
+    <script src="js/api.js?v=2"></script>
+    <script>
+        checkAuth('Student'); // Redirects if unauthorized
+
+        const attemptId = localStorage.getItem('active_attempt_id');
+        const examId = localStorage.getItem('active_exam_id');
+
+        if (!attemptId || !examId) {
+            window.location.href = 'student.html';
+        }
+
+        let isSubmitting = false;
+
+        // Tracking Tab Switches
+        document.addEventListener("visibilitychange", async () => {
+            if (document.hidden && !isSubmitting) {
+                try {
+                    await fetch(API_BASE + '/proctor/logs', {
+                        method: 'POST',
+                        headers: getHeaders(),
+                        body: JSON.stringify({ attempt_id: attemptId, action: 'TAB_SWITCH' })
+                    });
+                } catch(e) {}
+                alert('WARNING: Tab switch detected! This activity has been recorded.');
+            }
+        });
+
+        async function loadQuestions() {
+            try {
+                const res = await fetch(API_BASE + `/student/exams/${examId}/questions`, { headers: getHeaders() });
+                if (!res.ok) throw new Error('Failed to fetch questions');
+                
+                const questions = await res.json();
+
+                const container = document.getElementById('questionsContainer');
+                if (questions.length === 0) {
+                    container.innerHTML = '<p>No questions found for this exam.</p>';
+                    return;
+                }
+
+                questions.forEach((q, idx) => {
+                    const card = document.createElement('div');
+                    card.className = 'glass-panel question-card';
+                    
+                    let html = `<h3>Q${idx+1}. ${q.question_text} <span style="font-size:0.9rem; color:var(--text-muted);">[${q.marks} Marks]</span></h3>`;
+                    
+                    q.options.forEach(opt => {
+                        html += `
+                            <label class="option-lbl">
+                                <input type="radio" name="q_${q.question_id}" value="${opt.option_id}" 
+                                       onchange="saveResponse(${q.question_id}, ${opt.option_id})">
+                                ${opt.option_text}
+                            </label>
+                        `;
+                    });
+                    card.innerHTML = html;
+                    container.appendChild(card);
+                });
+            } catch (err) {
+                console.error("Error loading questions:", err);
+                document.getElementById('msg').innerHTML = `<p style="color:red;">Error loading exam questions.</p>`;
+            }
+        }
+
+        async function saveResponse(questionId, optionId) {
+            try {
+                await fetch(API_BASE + '/student/responses', {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ attempt_id: attemptId, question_id: questionId, selected_option_id: optionId })
+                });
+                console.log('Saved response');
+            } catch(e) {
+                console.error("Error saving response", e)
+            }
+        }
+
+        async function submitExam() {
+            try {
+                const res = await fetch(API_BASE + `/student/exams/${attemptId}/submit`, {
+                    method: 'POST', headers: getHeaders()
+                });
+                if (res.ok) {
+                    isSubmitting = true;
+                    localStorage.removeItem('active_attempt_id');
+                    localStorage.removeItem('active_exam_id');
+                    window.location.href = 'result.html';
+                } else {
+                    alert('Failed to submit exam');
+                }
+            } catch(e) {
+                alert('Error submitting exam: ' + e.message + '\n' + e.stack);
+                console.error(e);
+            }
+        }
+
+        loadQuestions();
+    </script>
+</body>
+</html>

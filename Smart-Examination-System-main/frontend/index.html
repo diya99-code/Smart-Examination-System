@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Exam | Login</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .auth-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .auth-box {
+            width: 100%;
+            max-width: 400px;
+        }
+        .toggle-text {
+            text-align: center;
+            margin-top: 1rem;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+        .toggle-text:hover { color: #fff; }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <div class="glass-panel auth-box">
+            <h1 id="formTitle">Welcome Back</h1>
+            <p style="color: var(--text-muted); margin-bottom: 2rem;">Sign in to your account</p>
+            
+            <div id="msg"></div>
+
+            <form id="authForm">
+                <div class="form-group" id="nameGroup" style="display:none;">
+                    <label>Full Name</label>
+                    <input type="text" id="name" placeholder="John Doe">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="email" required placeholder="name@college.edu">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="password" required placeholder="••••••••">
+                </div>
+                <div class="form-group" id="roleGroup" style="display:none;">
+                    <label>Role</label>
+                    <select id="role_id">
+                        <option value="2">Student</option>
+                        <option value="1">Admin</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%">Continue</button>
+            </form>
+            
+            <p class="toggle-text" id="toggleMode">Don't have an account? Sign up</p>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script>
+        let isLogin = true;
+        
+        document.getElementById('toggleMode').addEventListener('click', () => {
+            isLogin = !isLogin;
+            document.getElementById('formTitle').innerText = isLogin ? 'Welcome Back' : 'Create Account';
+            document.getElementById('toggleMode').innerText = isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in";
+            document.getElementById('nameGroup').style.display = isLogin ? 'none' : 'block';
+            document.getElementById('roleGroup').style.display = isLogin ? 'none' : 'block';
+            document.getElementById('msg').className = 'alert';
+        });
+
+        document.getElementById('authForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const payload = { email, password };
+
+            const endpoint = isLogin ? '/auth/login' : '/auth/register';
+            if (!isLogin) {
+                payload.name = document.getElementById('name').value;
+                payload.role_id = parseInt(document.getElementById('role_id').value);
+            }
+
+            try {
+                const res = await fetch(API_BASE + endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await res.json();
+                
+                if (res.ok) {
+                    if (isLogin) {
+                        localStorage.setItem('token', data.token);
+                        localStorage.setItem('role', data.role);
+                        localStorage.setItem('name', data.name);
+                        
+                        // Redirect based on role
+                        if(data.role === 'Admin') window.location.href = 'admin.html';
+                        else window.location.href = 'student.html';
+                    } else {
+                        showMsg('msg', 'Registration successful! Please login.', false);
+                        document.getElementById('toggleMode').click(); // Switch to login
+                    }
+                } else {
+                    showMsg('msg', data.error || data.message || 'Error occurred', true);
+                }
+            } catch (err) {
+                showMsg('msg', 'Connection to server failed.', true);
+            }
+        });
+    </script>
+</body>
+</html>

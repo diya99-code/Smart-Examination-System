@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <h2>Admin Portal</h2>
+        <div class="nav-links">
+            <span id="userNameDisplay">Admin</span>
+            <a onclick="logout()">Logout</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1>Dashboard Overview</h1>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
+            <!-- Create Exam Section -->
+            <div class="glass-panel">
+                <h3>Create New Exam</h3>
+                <div id="msgExam"></div>
+                <form id="createExamForm">
+                    <div class="form-group">
+                        <label>Subject Name</label>
+                        <input type="text" id="subject" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Exam Date & Time</label>
+                        <input type="datetime-local" id="exam_date" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Duration (Minutes)</label>
+                        <input type="number" id="duration" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Total Marks</label>
+                        <input type="number" id="total_marks" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Negative Marking (e.g. 0.25)</label>
+                        <input type="number" step="0.01" id="negative" value="0.0">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Create Exam</button>
+                </form>
+            </div>
+
+            <!-- Add Question Section -->
+            <div class="glass-panel">
+                <h3>Add Question to Exam</h3>
+                <div id="msgQuestion"></div>
+                <form id="addQuestionForm">
+                    <div class="form-group">
+                        <label>Select Exam</label>
+                        <select id="exam_id_select" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Question Text</label>
+                        <input type="text" id="q_text" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Marks</label>
+                        <input type="number" id="q_marks" value="1" required>
+                    </div>
+                    <div style="margin-bottom: 1rem;">
+                        <label style="color:var(--text-muted); font-size:0.9rem; margin-bottom:0.5rem; display:block;">Options (select the correct one)</label>
+                        <div style="display:flex; gap:10px; margin-bottom:5px;">
+                            <input type="radio" name="correct_opt" value="0" checked>
+                            <input type="text" id="opt_0" placeholder="Option 1" required>
+                        </div>
+                        <div style="display:flex; gap:10px; margin-bottom:5px;">
+                            <input type="radio" name="correct_opt" value="1">
+                            <input type="text" id="opt_1" placeholder="Option 2" required>
+                        </div>
+                        <div style="display:flex; gap:10px; margin-bottom:5px;">
+                            <input type="radio" name="correct_opt" value="2">
+                            <input type="text" id="opt_2" placeholder="Option 3" required>
+                        </div>
+                        <div style="display:flex; gap:10px; margin-bottom:5px;">
+                            <input type="radio" name="correct_opt" value="3">
+                            <input type="text" id="opt_3" placeholder="Option 4" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-secondary">Add Question</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- High-level Results view -->
+        <div class="glass-panel" style="margin-top: 2rem;">
+            <h3>All Student Results</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Student</th>
+                        <th>Exam</th>
+                        <th>Score</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="resultsTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script>
+        checkAuth('Admin');
+
+        async function fetchExams() {
+            const res = await fetch(API_BASE + '/admin/exams', { headers: getHeaders() });
+            const data = await res.json();
+            const select = document.getElementById('exam_id_select');
+            select.innerHTML = '';
+            data.forEach(ex => {
+                const opt = document.createElement('option');
+                opt.value = ex.exam_id;
+                opt.textContent = `${ex.subject} (${ex.exam_id})`;
+                select.appendChild(opt);
+            });
+        }
+
+        async function fetchResults() {
+            const res = await fetch(API_BASE + '/admin/results', { headers: getHeaders() });
+            const data = await res.json();
+            const tbody = document.getElementById('resultsTableBody');
+            tbody.innerHTML = '';
+            data.forEach(r => {
+                tbody.innerHTML += `<tr>
+                    <td>${r.student_name}</td>
+                    <td>${r.subject}</td>
+                    <td>${r.score !== null ? r.score : 'Pending'}</td>
+                    <td><span style="color: ${r.result_status === 'AUTO_GENERATED' ? 'var(--secondary)' : 'yellow'}">${r.result_status || 'In Progress'}</span></td>
+                </tr>`;
+            });
+        }
+
+        document.getElementById('createExamForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const payload = {
+                subject: document.getElementById('subject').value,
+                exam_date: document.getElementById('exam_date').value.replace('T', ' '),
+                duration_minutes: parseInt(document.getElementById('duration').value),
+                total_marks: parseInt(document.getElementById('total_marks').value),
+                negative_marking: parseFloat(document.getElementById('negative').value)
+            };
+            const res = await fetch(API_BASE + '/admin/exams', {
+                method: 'POST', headers: getHeaders(), body: JSON.stringify(payload)
+            });
+            if(res.ok) {
+                showMsg('msgExam', 'Exam created successfully!', false);
+                fetchExams();
+            } else {
+                const error = await res.json();
+                showMsg('msgExam', error.error, true);
+            }
+        });
+
+        document.getElementById('addQuestionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const exam_id = document.getElementById('exam_id_select').value;
+            const correctIdx = document.querySelector('input[name="correct_opt"]:checked').value;
+            
+            const options = [];
+            for(let i=0; i<4; i++) {
+                options.push({
+                    text: document.getElementById(`opt_${i}`).value,
+                    is_correct: i == correctIdx
+                });
+            }
+
+            const payload = {
+                text: document.getElementById('q_text').value,
+                marks: parseInt(document.getElementById('q_marks').value),
+                options: options
+            };
+
+            const res = await fetch(API_BASE + `/admin/exams/${exam_id}/questions`, {
+                method: 'POST', headers: getHeaders(), body: JSON.stringify(payload)
+            });
+            if(res.ok) {
+                showMsg('msgQuestion', 'Question added!', false);
+                document.getElementById('addQuestionForm').reset();
+            } else showMsg('msgQuestion', 'Failed to add question', true);
+        });
+
+        fetchExams();
+        fetchResults();
+    </script>
+</body>
+</html>

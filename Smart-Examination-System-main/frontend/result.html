@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Results</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <h2>My Results</h2>
+        <div class="nav-links">
+            <a href="student.html">Back to Dashboard</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1>Exam Results</h1>
+        <div class="glass-panel" style="margin-top: 2rem;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Subject</th>
+                        <th>Score</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="resultBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script>
+        checkAuth('Student');
+
+        async function loadResults() {
+            const res = await fetch(API_BASE + '/student/results', { headers: getHeaders() });
+            const results = await res.json();
+            const tbody = document.getElementById('resultBody');
+
+            if(results.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3">No results declared yet.</td></tr>';
+            }
+
+            results.forEach(r => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td style="font-weight:600">${r.subject}</td>
+                        <td style="font-size: 1.2rem; color: #6ee7b7">${r.score !== null ? r.score : 'Pending'}</td>
+                        <td>${r.result_status || 'Under Review'}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        loadResults();
+    </script>
+</body>
+</html>
